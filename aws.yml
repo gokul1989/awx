@@ -1,0 +1,39 @@
+---
+- name: Create an EC2 instance
+  hosts: localhost
+  gather_facts: False
+  vars:
+    keypair: awx-nginx
+    instance_type: t2.micro
+    image: ami-f3e5aa9c
+    region: ap-south-1
+  tasks:
+    - name: WebServer | Create the WebServer Instance(s)
+      local_action:
+        module: ec2
+        region: "{{ region }}"
+        group: nginx
+        keypair: "{{ keypair }}"
+        instance_type: "{{ instance_type }}"
+        user_data: |
+                   #!/bin/sh
+                   sudo apt-get install nginx -y
+                   echo "mysql-server-5.7 mysql-server/root_password password root" | sudo debconf-set-selections
+                   echo "mysql-server-5.7 mysql-server/root_password_again password root" | sudo debconf-set-selections
+                   apt-get -y install mysql-server-5.7 mysql-client
+                   mysql -u root -proot -e "use mysql; UPDATE user SET authentication_string=PASSWORD('redhat123456') WHERE User='root'; flush privileges;"
+                   sudo add-apt-repository ppa:ondrej/php -y && sudo apt-get update
+                   sudo apt-get install php-fpm php-mysql -y
+                   sudo apt-get install -y php5.6 php5.6-fpm
+                   php=`/usr/bin/php --ini |grep Loaded | awk '{print $4}'`
+                   sed -i 's/;cgi.fix_pathinfo=1/cgi.fix_pathinfo=0/g' $php
+                   systemctl restart php5.6-fpm
+
+        image: "{{ image }}"
+#        vpc_subnet_id: "{{ public_subnet }}"
+#        assign_public_ip: True
+        wait: True
+        wait_timeout: 600
+        aws_access_key: "AKIAJ4TBDB7DPU2S3K3A"
+        aws_secret_key: "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"
+
